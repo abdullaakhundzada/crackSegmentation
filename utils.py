@@ -7,9 +7,11 @@ from sklearn.cluster import KMeans
 import numpy as np
 import matplotlib.pyplot as plt
 
-transform = transforms.Compose([
-    transforms.Resize((256, 256)),
-    transforms.ToTensor()])
+def resize_tensor_transform(target_shape : tuple[int, int]) -> transforms.Compose:
+    return transforms.Compose([
+        transforms.Resize(target_shape),
+        transforms.ToTensor()])
+
 def print_model_summary(model, input_size=(3, 256, 256)):
     def hook(module, input, output):
         class_name = str(module.__class__).split(".")[-1].split("'")[0]
@@ -22,18 +24,15 @@ def print_model_summary(model, input_size=(3, 256, 256)):
         if isinstance(module, (nn.Conv2d, nn.ConvTranspose2d, AttentionGate)):
             hooks.append(module.register_forward_hook(hook))
     
-    # Create dummy input
-    x = torch.randn((1, *input_size))
+    x = torch.randn((1, *input_size)) # dummy input
     print("\nModel Feature Dimensions:")
     print("-" * 90)
     print(f"{'Layer':20} | {'Input Shape':35} | {'Output Shape':35}")
     print("-" * 90)
     
-    # Forward pass
     model.to("cpu")
     model(x)
     
-    # Remove hooks
     for hook in hooks:
         hook.remove()
 
