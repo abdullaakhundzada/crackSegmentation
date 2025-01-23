@@ -21,14 +21,14 @@ class AttentionGate(nn.Module):
         """
         The implementation of the Attention Gate from the paper 'Attention U-Net: Learning Where to Look for the Pancreas'
         The logic behind is very similar to the original U-Net architecture. The output of the previous layer 
-        in the decoder is concatenated with the output of the corresponding layer from the endocer part of the network.
+        in the decoder is concatenated with the output of the corresponding layer from the encoder part of the network.
         However, instead of concatenating them directly, these two layers are firstly (1) passed through 1x1 convolutional 
         layer separately, then (2) added together (the gate signal is resampled to match the shape of the encoding layer output), 
-        (3) passed through rectified linear arctivation, (4) the output of activation then passed to another 1x1 convolutional
-        layer, (5) finally, sigmoid acivation function is applied and (6) the result is resampled to match the input layer shape.
+        (3) passed through rectified linear activation, (4) the output of activation then passed to another 1x1 convolutional
+        layer, (5) finally, sigmoid activation function is applied and (6) the result is resampled to match the input layer shape.
 
         1x1 convolution allows (weighted) cross-talk between channels of input tensor given to the convolution layer.
-        Moreover, during the packpropagation process, the gradients of the summation operation in the attention gate mechanism 
+        Moreover, during the backpropagation process, the gradients of the summation operation in the attention gate mechanism 
         affect both the input and the gate layers, providing proper "flow of gradients". 
 
         The structure of the attention gate mechanism can be found in the figure 2 of the original paper.
@@ -65,7 +65,7 @@ class AttentionGate(nn.Module):
         input_size = x.size()[2:] 
         
         # Upsample gating signal to match skip connection size
-        g_up = nn.functional.interpolate(g, size=input_size, mode="bilinear", align_corners=True)
+        g_up = nn.functional.interpolate(g, size=input_size, mode="bicubic", align_corners=True)
         
         g1 = self.W_g(g_up)
         x1 = self.W_x(x)
