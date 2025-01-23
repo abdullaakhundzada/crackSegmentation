@@ -17,24 +17,44 @@ class DoubleConv(nn.Module):
         return self.double_conv(x)
 
 class AttentionGate(nn.Module):
-    def __init__(self, F_g, F_l, F_int):
+    def __init__(self, F_g, F_l, F_int): # dimension naming is inherited from the original paper
+        """
+        The implementation of the Attention Gate from the paper 'Attention U-Net: Learning Where to Look for the Pancreas'
+        The logic behind is very similar to the original U-Net architecture. The output of the previous layer 
+        in the decoder is concatenated with the output of the corresponding layer from the endocer part of the network.
+        However, instead of concatenating them directly, these two layers are firstly (1) passed through 1x1 convolutional 
+        layer separately, then (2) added together (the gate signal is resampled to match the shape of the encoding layer output), 
+        (3) passed through rectified linear arctivation, (4) the output of activation then passed to another 1x1 convolutional
+        layer, (5) finally, sigmoid acivation function is applied and (6) the result is resampled to match the input layer shape.
+
+        1x1 convolution allows (weighted) cross-talk between channels of input tensor given to the convolution layer.
+        Moreover, during the packpropagation process, the gradients of the summation operation in the attention gate mechanism 
+        affect both the input and the gate layers, providing proper "flow of gradients". 
+
+        The structure of the attention gate mechanism can be found in the figure 2 of the original paper.
+
+        Args:
+        F_g: int
+            The number of features the gate signal has
+        F_l: int
+            The number of features the previous layer passed as input has
+        F_int: int
+            The number of features for the intermediate layer
+        """
         super().__init__()
         
-        # Gating path
         self.W_g = nn.Sequential(
-            nn.Conv2d(F_g, F_int, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.Conv2d(F_g, F_int, kernel_size=1),
             nn.BatchNorm2d(F_int)
         )
         
-        # Skip connection path
         self.W_x = nn.Sequential(
-            nn.Conv2d(F_l, F_int, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.Conv2d(F_l, F_int, kernel_size=1),
             nn.BatchNorm2d(F_int)
         )
-        
-        # Final 1x1 conv
+
         self.psi = nn.Sequential(
-            nn.Conv2d(F_int, 1, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.Conv2d(F_int, 1, kernel_size=1),
             nn.BatchNorm2d(1),
             nn.Sigmoid()
         )
@@ -42,17 +62,14 @@ class AttentionGate(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         
     def forward(self, g, x):
-        # Get input dimensions
-        input_size = x.size()[2:]
+        input_size = x.size()[2:] 
         
         # Upsample gating signal to match skip connection size
         g_up = nn.functional.interpolate(g, size=input_size, mode="bilinear", align_corners=True)
         
-        # Apply convolutions
         g1 = self.W_g(g_up)
         x1 = self.W_x(x)
         
-        # Element-wise addition and ReLU
         psi = self.relu(g1 + x1)
         psi = self.psi(psi)
         
@@ -73,9 +90,9 @@ class AttentionUNet(nn.Module):
         
         # Attention Gates
         self.attention4 = AttentionGate(F_g=1024, F_l=512, F_int=256)
-        self.attention3 = AttentionGate(F_g=512, F_l=256, F_int=128)
-        self.attention2 = AttentionGate(F_g=256, F_l=128, F_int=64)
-        self.attention1 = AttentionGate(F_g=128, F_l=64, F_int=32)
+        self.attention3 = AttentionGate(F_g=512,  F_l=256, F_int=128)
+        self.attention2 = AttentionGate(F_g=256,  F_l=128, F_int=64)
+        self.attention1 = AttentionGate(F_g=128,  F_l=64,  F_int=32)
         
         # Decoder
         self.upconv4 = nn.ConvTranspose2d(1024, 512, kernel_size=2, stride=2)
