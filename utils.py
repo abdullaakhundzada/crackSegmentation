@@ -9,7 +9,8 @@ import matplotlib.pyplot as plt
 
 def resize_tensor_transform(target_shape : tuple[int, int]) -> transforms.Compose:
     return transforms.Compose([
-        transforms.Resize(target_shape),
+        transforms.Resize(target_shape, 
+                          interpolation=transforms.InterpolationMode.BICUBIC),
         transforms.ToTensor()])
 
 def print_model_summary(model, input_size=(3, 256, 256)):
@@ -88,6 +89,8 @@ def predict_image(model, image_path, device):
     Predict cracks in a single image with K-means refinement
     """
     # Load and preprocess image
+    # TODO: fix the transform in the prediction function. 
+    # TODO: build a unified pipeline for the image pre-processing and past-processing
     
     image = Image.open(image_path).convert("RGB")
     image_tensor = transform(image).unsqueeze(0).to(device)
@@ -106,6 +109,7 @@ def predict_and_visualize(model, image_path, device):
     Predict cracks and visualize attention maps
     """
     # Load and preprocess image
+    # TODO: remove the old transform method, use unified pipeline
     transform = transforms.Compose([
         transforms.Resize((256, 256)),
         transforms.ToTensor(),
