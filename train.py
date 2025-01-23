@@ -9,12 +9,12 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from PIL import Image
 from tqdm import tqdm
-from custom_utils import transform
+from utils import resize_tensor_transform
 
 class CrackDataset(Dataset):
-    def __init__(self, data_dir):
+    def __init__(self, data_dir, transform_shape : tuple[int, int]):
         self.data_dir = data_dir
-        self.transform = transform
+        self.transform = resize_tensor_transform(transform_shape)
         self.images = []
         self.masks = []
         
@@ -23,7 +23,7 @@ class CrackDataset(Dataset):
         mask_dir = os.path.join(data_dir, "masks")
         
         for img_name in os.listdir(image_dir):
-            if img_name.endswith(".jpg"):
+            if img_name.endswith((".jpg", ".png")):
                 self.images.append(os.path.join(image_dir, img_name))
                 self.masks.append(os.path.join(mask_dir, img_name))
     
@@ -87,13 +87,16 @@ class CombinedLoss(nn.Module):
         bce = self.bce_loss(predictions, targets)
         return self.dice_weight * dice + self.bce_weight * bce
 
-def train_model(model, train_loader, val_loader, device, num_epochs=10, save_all=True, checkpoint_dir="", result_path="results.csv", visualize=True):
+def train_model(model, train_loader, val_loader, device, 
+                dice_loss_weight=0.5, bce_loss_weight=0.5,
+                num_epochs=10, save_all=False, checkpoint_dir="", 
+                result_path="results.csv", visualize=True):
 
     results = {"epoch": [], "train_loss" : [], "val_loss" : []}
-    criterion = CombinedLoss(dice_weight=0.5, bce_weight=0.5)
+    criterion = CombinedLoss(dice_weight=dice_loss_weight, bce_weight=bce_loss_weight)
     optimizer = optim.AdamW(model.parameters(), lr=1e-3)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", patience=3)
-    
+    model.to(device)
     best_val_loss = float("inf")
     
     for epoch in tqdm(range(num_epochs), maxinterval=num_epochs, desc="Epoch"):
@@ -122,13 +125,13 @@ def train_model(model, train_loader, val_loader, device, num_epochs=10, save_all
                 outputs = model(images)
                 val_loss += criterion(outputs, masks).item()
         
-        avg_train_loss = train_loss/len(train_loader)
-        avg_val_loss   = val_loss / len(val_loader)
+        avg_train_loss = train_loss / len(train_loader)
+        avg_val_loss   = val_loss   / len(val_loader)
         scheduler.step(avg_val_loss)
         
-        print(f"Epoch {epoch+1}/{num_epochs}")
-        print(f"Training Loss: {avg_train_loss:.4f}")
-        print(f"Validation Loss: {avg_val_loss:.4f}")
+        tqdm.write(f"Epoch {epoch+1}/{num_epochs}")
+        tqdm.write(f"Training Loss: {avg_train_loss:.4f}")
+        tqdm.write(f"Validation Loss: {avg_val_loss:.4f}")
 
         results["epoch"].append(epoch)
         results["train_loss"].append(avg_train_loss)
