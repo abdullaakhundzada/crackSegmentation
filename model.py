@@ -76,8 +76,14 @@ class AttentionGate(nn.Module):
         return x * psi
 
 class AttentionUNet(nn.Module):
-    def __init__(self, in_channels=3, out_channels=1):
+    def __init__(self, in_channels=3, out_channels=1, image_shape=(256, 256)):
         super().__init__()
+
+        # save the image shape data into the state dictionary of the model to carry
+        # this info with the model itself after the training is complete
+        self.image_shape = image_shape
+
+        # TODO change post-processing to take the image shape directly from the model state dict 
         
         # Encoder
         self.encoder1 = DoubleConv(in_channels, 64)
